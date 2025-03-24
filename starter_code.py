@@ -21,13 +21,43 @@ import json
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        # TODO - define the layers of the network you will use
-        ...
-    
-    def forward(self, x):
-        # TODO - define the forward pass of the network you will use
-        ...
+        self.conv1=nn.Conv2d(in_channels=3,out_channels=32,kernel_size=3,padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.relu1=nn.ReLU()
+        self.maxpool1=nn.MaxPool2d(kernel_size=2,stride=2)
+        
+        self.conv2=nn.Conv2d(in_channels=32,out_channels=64,kernel_size=3,padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.relu2=nn.ReLU()
+        self.maxpool2=nn.MaxPool2d(kernel_size=2,stride=2)
 
+        self.conv3=nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3,padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+        self.relu3=nn.ReLU()
+        self.maxpool3=nn.MaxPool2d(kernel_size=2,stride=2)
+
+        self.conv4=nn.Conv2d(in_channels=128,out_channels=256,kernel_size=3,padding=1)
+        self.bn4 = nn.BatchNorm2d(256)
+        self.relu4=nn.ReLU()
+        self.maxpool4=nn.MaxPool2d(kernel_size=2,stride=2)
+
+
+        self.fc1=nn.Linear(256*2*2,512)
+        self.relu5=nn.ReLU()
+        self.fc2=nn.Linear(512,100)
+        
+    def forward(self, x):
+        x = self.relu1(self.bn1(self.conv1(x)))
+        x=self.maxpool1(x)
+        x = self.relu2(self.bn2(self.conv2(x)))
+        x=self.maxpool2(x)
+        x = self.relu3(self.bn3(self.conv3(x)))
+        x=self.maxpool3(x)
+        x = self.relu4(self.bn4(self.conv4(x)))
+        x=self.maxpool4(x)
+        x=x.view(x.size(0),-1)
+        x=self.relu5(self.fc1(x))
+        x=self.fc2(x)
         return x
 
 ################################################################################
@@ -51,10 +81,14 @@ def train(epoch, model, trainloader, optimizer, criterion, CONFIG):
         inputs, labels = inputs.to(device), labels.to(device)
 
         ### TODO - Your code here
-        ...
+        optimizer.zero_grad()
+        outputs=model(inputs)
+        loss=criterion(outputs,labels)
+        loss.backward()
+        optimizer.step()
 
-        running_loss += ...   ### TODO
-        _, predicted = ...    ### TODO
+        running_loss += loss.item()
+        _, predicted = torch.max(outputs.data, 1)
 
         total += labels.size(0)
         correct += predicted.eq(labels).sum().item()
@@ -87,11 +121,11 @@ def validate(model, valloader, criterion, device):
             # move inputs and labels to the target device
             inputs, labels = inputs.to(device), labels.to(device)
 
-            outputs = ... ### TODO -- inference
-            loss = ...    ### TODO -- loss calculation
+            outputs = model(inputs) ### TODO -- inference
+            loss = criterion(outputs,labels)   ### TODO -- loss calculation
 
-            running_loss += ...  ### SOLUTION -- add loss from this sample
-            _, predicted = ...   ### SOLUTION -- predict the class
+            running_loss += loss.item()  ### SOLUTION -- add loss from this sample
+            _, predicted = torch.max(outputs.data,1)   ### SOLUTION -- predict the class
 
             total += labels.size(0)
             correct += predicted.eq(labels).sum().item()
@@ -114,11 +148,10 @@ def main():
 
 
     CONFIG = {
-        "model": "MyModel",   # Change name when using a different model
-        "batch_size": 8, # run batch size finder to find optimal batch size
-        "learning_rate": 0.1,
-        "epochs": 5,  # Train for longer in a real scenario
-        "num_workers": 4, # Adjust based on your system
+        "model": "SimpleCNN_1",   # Change name when using a different model
+        "batch_size": 128, # run batch size finder to find optimal batch size
+        "learning_rate": 1e-3,
+        "num_workers": 2, # Adjust based on your system
         "device": "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu",
         "data_dir": "./data",  # Make sure this directory exists
         "ood_dir": "./data/ood-test",
@@ -135,16 +168,22 @@ def main():
     ############################################################################
 
     transform_train = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), # Example normalization
-    ])
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomCrop(32, padding=4),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+])
 
     ###############
     # TODO Add validation and test transforms - NO augmentation for validation/test
     ###############
 
     # Validation and test transforms (NO augmentation)
-    transform_test = ...   ### TODO -- BEGIN SOLUTION
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])   ### TODO -- BEGIN SOLUTION
 
     ############################################################################
     #       Data Loading
@@ -154,22 +193,22 @@ def main():
                                             download=True, transform=transform_train)
 
     # Split train into train and validation (80/20 split)
-    train_size = ...   ### TODO -- Calculate training set size
-    val_size = ...     ### TODO -- Calculate validation set size
-    trainset, valset = ...  ### TODO -- split into training and validation sets
+    train_size = int(0.8*len(trainset))   ### TODO -- Calculate training set size
+    val_size = len(trainset)-train_size     ### TODO -- Calculate validation set size
+    trainset, valset = torch.utils.data.random_split(trainset,[train_size,val_size])  ### TODO -- split into training and validation setss
 
     ### TODO -- define loaders and test set
-    trainloader = ...
-    valloader = ...
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=CONFIG["batch_size"],shuffle=True, num_workers=CONFIG["num_workers"])
+    valloader = torch.utils.data.DataLoader(valset, batch_size=CONFIG["batch_size"],shuffle=False, num_workers=CONFIG["num_workers"])
 
     # ... (Create validation and test loaders)
-    testset = ...
-    testloader = ...
+    testset = torchvision.datasets.CIFAR100(root=CONFIG["data_dir"],train=False,download=True,transform=transform_test)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=CONFIG["batch_size"],shuffle=False, num_workers=CONFIG["num_workers"])
     
     ############################################################################
     #   Instantiate model and move to target device
     ############################################################################
-    model = ...   # instantiate your model ### TODO
+    model = SimpleCNN()   # instantiate your model ### TODO
     model = model.to(CONFIG["device"])   # move it to target device
 
     print("\nModel summary:")
@@ -178,7 +217,7 @@ def main():
     # The following code you can run once to find the batch size that gives you the fastest throughput.
     # You only have to do this once for each machine you use, then you can just
     # set it in CONFIG.
-    SEARCH_BATCH_SIZES = False
+    SEARCH_BATCH_SIZES = True
     if SEARCH_BATCH_SIZES:
         from utils import find_optimal_batch_size
         print("Finding optimal batch size...")
@@ -190,13 +229,13 @@ def main():
     ############################################################################
     # Loss Function, Optimizer and optional learning rate scheduler
     ############################################################################
-    criterion = ...   ### TODO -- define loss criterion
-    optimizer = ...   ### TODO -- define optimizer
-    scheduler = ...  # Add a scheduler   ### TODO -- you can optionally add a LR scheduler
+    criterion = nn.CrossEntropyLoss()   ### TODO -- define loss criterion
+    optimizer = optim.Adam(model.parameters(), lr=CONFIG["learning_rate"], weight_decay=5e-4)   ### TODO -- define optimizer
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.1)  # Add a scheduler   ### TODO -- you can optionally add a LR scheduler
 
 
     # Initialize wandb
-    wandb.init(project="-sp25-ds542-challenge", config=CONFIG)
+    wandb.init(project="sp25-ds542-challenge", config=CONFIG)
     wandb.watch(model)  # watch the model gradients
 
     ############################################################################
