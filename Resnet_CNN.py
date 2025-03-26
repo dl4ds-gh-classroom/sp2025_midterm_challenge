@@ -35,9 +35,11 @@ def train(epoch, model, trainloader, optimizer, criterion, CONFIG):
         optimizer.zero_grad()
         outputs=model(inputs)
         loss=criterion(outputs,labels)
+        loss.backward()
+        optimizer.step()
 
 
-        running_loss += loss  ### Add the losses
+        running_loss += loss.item()  ### Add the losses
         _, predicted = torch.max(outputs.data,1)
 
         total += labels.size(0)
@@ -70,7 +72,7 @@ def validate(model, valloader, criterion, device):
             outputs = model(inputs) 
             loss = criterion(outputs,labels)
 
-            running_loss += loss  
+            running_loss += loss.item() 
             _, predicted = torch.max(outputs.data,1)   
 
             total += labels.size(0)
@@ -90,7 +92,7 @@ def main():
         "learning_rate": 1e-4,
         "epochs": 10,  # Train for longer in a real scenario
         "num_workers": 2, # Adjust based on your system
-        "device": "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu",
+        "device": "cuda" if torch.cuda.is_available() else "cpu",
         "data_dir": "./data",  # Make sure this directory exists
         "ood_dir": "./data/ood-test",
         "wandb_project": "sp25-ds542-challenge",
@@ -130,12 +132,13 @@ def main():
     valloader = torch.utils.data.DataLoader(valset, batch_size=CONFIG["batch_size"],shuffle=False, num_workers=CONFIG["num_workers"])
 
     
-    testset = torchvision.datasets.CIFAR100(root='./data', train=False,download=True, transform=transform_train)
+    testset = torchvision.datasets.CIFAR100(root='./data', train=False,download=True, transform=transform_test)
     testloader = torch.utils.data.DataLoader(testset, batch_size=CONFIG["batch_size"],shuffle=False, num_workers=CONFIG["num_workers"])
     
     
     model = tv_models.resnet18(pretrained=True)   
-    model = model.to(CONFIG["device"])   
+    model.fc = nn.Linear(model.fc.in_features, 100)  # <- Add this
+    model = model.to(CONFIG["device"])
 
     print("\nModel summary:")
     print(f"{model}\n")
