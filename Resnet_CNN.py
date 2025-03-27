@@ -15,6 +15,14 @@ import json
 ################################################################################
 # Model Definition (Simple Example - You need to complete)
 # For Part 2 you have the option of using a predefined network and
+def set_seed(seed=42):
+	torch.manual_seed(seed)
+	np.random.seed(seed)
+	random.seed(seed)
+	if torch.cuda.is_available():
+		torch.cuda.manual_seed(seed)
+		torch.cuda.manual_seed_all(seed)
+
 def train(epoch, model, trainloader, optimizer, criterion, CONFIG):
     device = CONFIG["device"]
     model.train()  # Set the model to training mode
@@ -89,8 +97,8 @@ def main():
     CONFIG = {
         "model": "ResNet_18_CNN",   # Change name when using a different model
         "batch_size": 128, # run batch size finder to find optimal batch size
-        "learning_rate": 1e-4,
-        "epochs": 10,  # Train for longer in a real scenario
+        "learning_rate": 1e-3,
+        "epochs": 50,  # Train for longer in a real scenario
         "num_workers": 2, # Adjust based on your system
         "device": "cuda" if torch.cuda.is_available() else "cpu",
         "data_dir": "./data",  # Make sure this directory exists
@@ -104,8 +112,9 @@ def main():
     pprint.pprint(CONFIG)
 
     transform_train = transforms.Compose([
-        transforms.Resize(256),
-        transforms.RandomCrop(224),
+        transforms.RandomCrop(32, padding=4),
+		transforms.RandomHorizontalFlip(),
+        transforms.ColorJitter(brightness=0.2,contrast=0.2,saturation=0.2,hue=0.1),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]), 
     ])
@@ -113,8 +122,8 @@ def main():
     
     # Validation and test transforms (NO augmentation)
     transform_test = transforms.Compose([
-        transforms.Resize(256),
-        transforms.RandomCrop(224),
+        transforms.RandomCrop(32, padding=4),
+		transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]), 
     ])
@@ -136,8 +145,8 @@ def main():
     testloader = torch.utils.data.DataLoader(testset, batch_size=CONFIG["batch_size"],shuffle=False, num_workers=CONFIG["num_workers"])
     
     
-    model = tv_models.resnet18(pretrained=True)   
-    model.fc = nn.Linear(model.fc.in_features, 100)  # <- Add this
+    model = tv_models.resnet34(weights=None)   
+    model.fc = nn.Linear(model.fc.in_features, 100)  
     model = model.to(CONFIG["device"])
 
     print("\nModel summary:")
@@ -152,9 +161,9 @@ def main():
         print(f"Using batch size: {CONFIG['batch_size']}")
     
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = optim.Adam(model.parameters(), lr=CONFIG["learning_rate"], weight_decay=5e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CONFIG["epochs"])
 
     wandb.init(project="-sp25-ds542-challenge", config=CONFIG)
     wandb.watch(model)  # watch the model gradients
