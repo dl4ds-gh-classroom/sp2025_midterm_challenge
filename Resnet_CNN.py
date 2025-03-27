@@ -98,7 +98,7 @@ def main():
         "model": "ResNet_18_CNN",   # Change name when using a different model
         "batch_size": 128, # run batch size finder to find optimal batch size
         "learning_rate": 1e-3,
-        "epochs": 50,  # Train for longer in a real scenario
+        "epochs": 100,  # Train for longer in a real scenario
         "num_workers": 2, # Adjust based on your system
         "device": "cuda" if torch.cuda.is_available() else "cpu",
         "data_dir": "./data",  # Make sure this directory exists
