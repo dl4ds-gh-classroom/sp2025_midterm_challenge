@@ -72,6 +72,8 @@ In addition to the code, we require a short report that includes:
 * **Experiment Tracking Summary:**  Include screenshots or summaries from the experiment tracking tool.
   You can use the WandB Reports UI to create a report as well.
 
+**Include your report in your repo, either by replacing/updating this top level readme or commiting it as a separate PDF or .md file.**
+
 ## Grading Rubric
 
 The grading rubric is as follows:
